@@ -3,6 +3,13 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { McpAgent } from "agents/mcp";
 import { z } from "zod";
 import { githubRequest } from "./github-api";
+import {
+	fullIssue,
+	slimComment,
+	slimIssue,
+	slimPullRequest,
+	slimRepo,
+} from "./github-format";
 import { GitHubHandler } from "./github-handler";
 
 type Props = {
@@ -52,9 +59,10 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 					`/user/repos${query ? `?${query}` : ""}`,
 					token,
 				);
-				const data = await res.json();
+				const data = (await res.json()) as unknown[];
+				const slim = Array.isArray(data) ? data.map(slimRepo) : data;
 				return {
-					content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+					content: [{ type: "text", text: JSON.stringify(slim, null, 2) }],
 				};
 			},
 		);
@@ -152,9 +160,10 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 					`/repos/${owner}/${repo}/issues${query ? `?${query}` : ""}`,
 					token,
 				);
-				const data = await res.json();
+				const data = (await res.json()) as unknown[];
+				const slim = Array.isArray(data) ? data.map(slimIssue) : data;
 				return {
-					content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+					content: [{ type: "text", text: JSON.stringify(slim, null, 2) }],
 				};
 			},
 		);
@@ -176,7 +185,9 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 				);
 				const data = await res.json();
 				return {
-					content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+					content: [
+						{ type: "text", text: JSON.stringify(fullIssue(data), null, 2) },
+					],
 				};
 			},
 		);
@@ -317,9 +328,10 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 					`/repos/${owner}/${repo}/issues/${issue_number}/comments${query ? `?${query}` : ""}`,
 					token,
 				);
-				const data = await res.json();
+				const data = (await res.json()) as unknown[];
+				const slim = Array.isArray(data) ? data.map(slimComment) : data;
 				return {
-					content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+					content: [{ type: "text", text: JSON.stringify(slim, null, 2) }],
 				};
 			},
 		);
@@ -410,9 +422,10 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 					`/repos/${owner}/${repo}/pulls${query ? `?${query}` : ""}`,
 					token,
 				);
-				const data = await res.json();
+				const data = (await res.json()) as unknown[];
+				const slim = Array.isArray(data) ? data.map(slimPullRequest) : data;
 				return {
-					content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+					content: [{ type: "text", text: JSON.stringify(slim, null, 2) }],
 				};
 			},
 		);
