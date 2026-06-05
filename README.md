@@ -11,8 +11,8 @@ Users connect via MCP clients (Claude Desktop, Cursor, etc.) and authenticate wi
 | Repositories | `list_repos` | List repositories for the authenticated user |
 | | `get_repo` | Get repository details |
 | | `search_repos` | Search repositories |
-| Issues | `list_issues` | List issues for a repository |
-| | `get_issue` | Get issue details |
+| Issues | `list_issues` | List issues for a repository (optionally join ProjectV2 status) |
+| | `get_issue` | Get issue details (optionally join ProjectV2 status) |
 | | `create_issue` | Create a new issue |
 | | `update_issue` | Update an issue |
 | | `create_issue_comment` | Add a comment to an issue |
