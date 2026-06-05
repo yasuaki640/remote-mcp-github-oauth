@@ -2,7 +2,7 @@ import OAuthProvider from "@cloudflare/workers-oauth-provider";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { McpAgent } from "agents/mcp";
 import { z } from "zod";
-import { githubRequest } from "./github-api";
+import { fetchProjectStatuses, githubRequest } from "./github-api";
 import {
 	fullIssue,
 	slimComment,
@@ -146,9 +146,24 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 						.optional()
 						.describe("Results per page (max 100)"),
 					page: z.number().optional().describe("Page number"),
+					include_project_status: z
+						.boolean()
+						.optional()
+						.describe(
+							"When true, join each issue's ProjectV2 membership and Status field (adds a project_status array per issue)",
+						),
 				},
 			},
-			async ({ owner, repo, state, sort, direction, per_page, page }) => {
+			async ({
+				owner,
+				repo,
+				state,
+				sort,
+				direction,
+				per_page,
+				page,
+				include_project_status,
+			}) => {
 				const params = new URLSearchParams();
 				if (state) params.set("state", state);
 				if (sort) params.set("sort", sort);
@@ -161,7 +176,23 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 					token,
 				);
 				const data = (await res.json()) as unknown[];
-				const slim = Array.isArray(data) ? data.map(slimIssue) : data;
+				let slim: unknown = Array.isArray(data) ? data.map(slimIssue) : data;
+				if (include_project_status && Array.isArray(slim)) {
+					const issues = slim as ReturnType<typeof slimIssue>[];
+					const numbers = issues
+						.filter((i) => !i.is_pull_request)
+						.map((i) => i.number);
+					const statuses = await fetchProjectStatuses(
+						token,
+						owner,
+						repo,
+						numbers,
+					);
+					slim = issues.map((i) => ({
+						...i,
+						project_status: statuses.get(i.number) ?? [],
+					}));
+				}
 				return {
 					content: [{ type: "text", text: JSON.stringify(slim, null, 2) }],
 				};
@@ -176,18 +207,29 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 					owner: z.string().describe("Repository owner"),
 					repo: z.string().describe("Repository name"),
 					issue_number: z.number().describe("Issue number"),
+					include_project_status: z
+						.boolean()
+						.optional()
+						.describe(
+							"When true, join the issue's ProjectV2 membership and Status field (adds a project_status array)",
+						),
 				},
 			},
-			async ({ owner, repo, issue_number }) => {
+			async ({ owner, repo, issue_number, include_project_status }) => {
 				const res = await githubRequest(
 					`/repos/${owner}/${repo}/issues/${issue_number}`,
 					token,
 				);
 				const data = await res.json();
+				const full: Record<string, unknown> = fullIssue(data);
+				if (include_project_status) {
+					const statuses = await fetchProjectStatuses(token, owner, repo, [
+						issue_number,
+					]);
+					full.project_status = statuses.get(issue_number) ?? [];
+				}
 				return {
-					content: [
-						{ type: "text", text: JSON.stringify(fullIssue(data), null, 2) },
-					],
+					content: [{ type: "text", text: JSON.stringify(full, null, 2) }],
 				};
 			},
 		);
