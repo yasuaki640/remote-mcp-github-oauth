@@ -337,6 +337,41 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 		);
 
 		this.server.registerTool(
+			"delete_issue_comment",
+			{
+				description:
+					"Delete a comment on an issue or pull request by its comment ID",
+				inputSchema: {
+					owner: z.string().describe("Repository owner"),
+					repo: z.string().describe("Repository name"),
+					comment_id: z.number().describe("ID of the comment to delete"),
+				},
+			},
+			async ({ owner, repo, comment_id }) => {
+				const res = await githubRequest(
+					`/repos/${owner}/${repo}/issues/comments/${comment_id}`,
+					token,
+					{ method: "DELETE" },
+				);
+				if (!res.ok) {
+					const text = await res.text();
+					return {
+						isError: true,
+						content: [
+							{
+								type: "text",
+								text: `Failed to delete comment ${comment_id}: ${res.status} ${text}`,
+							},
+						],
+					};
+				}
+				return {
+					content: [{ type: "text", text: `Deleted comment ${comment_id}` }],
+				};
+			},
+		);
+
+		this.server.registerTool(
 			"search_issues",
 			{
 				description: "Search issues and pull requests across repositories",
