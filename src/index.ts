@@ -382,6 +382,90 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 			},
 		);
 
+		this.server.registerTool(
+			"add_sub_issue",
+			{
+				description:
+					"Add an existing issue as a sub-issue of a parent issue. Wraps the GitHub GraphQL addSubIssue mutation, resolving issue numbers to node IDs internally.",
+				inputSchema: {
+					owner: z.string().describe("Repository owner"),
+					repo: z.string().describe("Repository name"),
+					parent_issue_number: z
+						.number()
+						.describe("Issue number of the parent issue"),
+					sub_issue_number: z
+						.number()
+						.describe("Issue number of the issue to attach as a sub-issue"),
+				},
+			},
+			async ({ owner, repo, parent_issue_number, sub_issue_number }) => {
+				// addSubIssue takes GraphQL node IDs, so resolve both issues first.
+				const lookup = await githubRequest("/graphql", token, {
+					method: "POST",
+					body: {
+						query: `query($owner: String!, $repo: String!, $parent: Int!, $sub: Int!) {
+							repository(owner: $owner, name: $repo) {
+								parent: issue(number: $parent) { id }
+								sub: issue(number: $sub) { id }
+							}
+						}`,
+						variables: {
+							owner,
+							repo,
+							parent: parent_issue_number,
+							sub: sub_issue_number,
+						},
+					},
+				});
+				const lookupData = (await lookup.json()) as {
+					data?: {
+						repository?: {
+							parent?: { id: string } | null;
+							sub?: { id: string } | null;
+						} | null;
+					};
+				};
+				const parentId = lookupData.data?.repository?.parent?.id;
+				const subId = lookupData.data?.repository?.sub?.id;
+				if (!parentId || !subId) {
+					return {
+						isError: true,
+						content: [
+							{
+								type: "text",
+								text: JSON.stringify(
+									{
+										error:
+											"Could not resolve issue node IDs. Check owner/repo and issue numbers.",
+										response: lookupData,
+									},
+									null,
+									2,
+								),
+							},
+						],
+					};
+				}
+
+				const res = await githubRequest("/graphql", token, {
+					method: "POST",
+					body: {
+						query: `mutation($issueId: ID!, $subIssueId: ID!) {
+							addSubIssue(input: { issueId: $issueId, subIssueId: $subIssueId }) {
+								issue { number title }
+								subIssue { number title }
+							}
+						}`,
+						variables: { issueId: parentId, subIssueId: subId },
+					},
+				});
+				const data = await res.json();
+				return {
+					content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+				};
+			},
+		);
+
 		// --- Pull Request tools ---
 
 		this.server.registerTool(
