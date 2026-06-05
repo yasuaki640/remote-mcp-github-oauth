@@ -17,6 +17,7 @@ Users connect via MCP clients (Claude Desktop, Cursor, etc.) and authenticate wi
 | | `update_issue` | Update an issue |
 | | `create_issue_comment` | Add a comment to an issue |
 | | `list_issue_comments` | List comments on an issue |
+| | `delete_issue_comment` | Delete a comment on an issue or pull request |
 | | `search_issues` | Search issues and pull requests |
 | Pull Requests | `list_pull_requests` | List pull requests |
 | | `get_pull_request` | Get pull request details |
